@@ -1,0 +1,11 @@
+[package]
+name = "calculator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+crossterm = "0.28.1"
+ratatui = "0.29.0"
+nom = "8.0.0"
+rust_decimal = "1.36.0"
+rust_decimal_macros = "1.36.0"
