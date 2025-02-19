@@ -181,55 +181,15 @@ fn precedence(token: &Token) -> u8 {
 /// Evaluates a slice of tokens and returns the result as a Decimal.
 pub fn evaluate(tokens: &[Token]) -> Result<Decimal, Box<dyn Error>> {
     if tokens.is_empty() {
-        return Err("Invalid expression".into());
-    }
-
-    // Special case: check for pattern (a^n) + b - (a^n) which should simplify to b
-    if tokens.len() >= 7 {
-        let mut i = 0;
-        while i < tokens.len() - 6 {
-            if let (
-                Token::LeftParen,
-                Token::Number(base1),
-                Token::Exponentiation,
-                Token::Number(exp1),
-                Token::RightParen,
-                Token::Plus,
-                Token::Number(b),
-                Token::Minus,
-                Token::LeftParen,
-                Token::Number(base2),
-                Token::Exponentiation,
-                Token::Number(exp2),
-                Token::RightParen,
-            ) = (
-                &tokens[i],
-                &tokens[i + 1],
-                &tokens[i + 2],
-                &tokens[i + 3],
-                &tokens[i + 4],
-                &tokens[i + 5],
-                &tokens[i + 6],
-                &tokens[i + 7],
-                &tokens[i + 8],
-                &tokens[i + 9],
-                &tokens[i + 10],
-                &tokens[i + 11],
-                &tokens[i + 12],
-            ) {
-                if base1 == base2 && exp1 == exp2 && exp1.fract().is_zero() {
-                    // Pattern matched! Return b directly
-                    return Ok(*b);
-                }
-            }
-            i += 1;
-        }
+        return Err("Empty expression".into());
     }
 
     let mut numbers: Vec<Decimal> = Vec::new();
     let mut operators: Vec<Token> = Vec::new();
     let mut paren_count = 0;
     let mut expect_paren = false;
+    let mut last_was_number = false;
+    let mut last_was_operator = false;
 
     let mut i = 0;
     while i < tokens.len() {
@@ -238,12 +198,19 @@ pub fn evaluate(tokens: &[Token]) -> Result<Decimal, Box<dyn Error>> {
                 if expect_paren {
                     return Err("Expected '(' after function".into());
                 }
+                if last_was_number {
+                    return Err("Invalid expression: consecutive numbers".into());
+                }
                 numbers.push(*n);
+                last_was_number = true;
+                last_was_operator = false;
             }
             Token::LeftParen => {
                 paren_count += 1;
                 expect_paren = false;
                 operators.push(tokens[i].clone());
+                last_was_number = false;
+                last_was_operator = false;
             }
             Token::RightParen => {
                 paren_count -= 1;
@@ -262,23 +229,32 @@ pub fn evaluate(tokens: &[Token]) -> Result<Decimal, Box<dyn Error>> {
                 if let Some(Token::Sqrt | Token::Abs) = operators.last() {
                     apply_operator(&mut numbers, operators.pop().unwrap())?;
                 }
+                last_was_number = false;
+                last_was_operator = false;
             }
             Token::Sqrt | Token::Abs => {
                 expect_paren = true;
                 operators.push(tokens[i].clone());
+                last_was_number = false;
+                last_was_operator = false;
             }
             op @ (Token::Plus
             | Token::Minus
             | Token::Multiply
             | Token::Divide
             | Token::Modulo
-            | Token::Exponentiation
-            | Token::Factorial) => {
+            | Token::Exponentiation) => {
                 if expect_paren {
                     return Err("Expected '(' after function".into());
                 }
-                let is_right_associative = matches!(op, Token::Exponentiation);
+                if last_was_operator {
+                    return Err("Invalid expression: consecutive operators".into());
+                }
+                if !last_was_number && !matches!(op, Token::Minus) {
+                    return Err("Invalid expression: operator without operand".into());
+                }
 
+                let is_right_associative = matches!(op, Token::Exponentiation);
                 while let Some(top_op) = operators.last() {
                     if let Token::LeftParen = top_op {
                         break;
@@ -292,6 +268,8 @@ pub fn evaluate(tokens: &[Token]) -> Result<Decimal, Box<dyn Error>> {
                     }
                 }
                 operators.push(tokens[i].clone());
+                last_was_number = false;
+                last_was_operator = true;
             }
         }
         i += 1;
@@ -302,6 +280,9 @@ pub fn evaluate(tokens: &[Token]) -> Result<Decimal, Box<dyn Error>> {
     }
     if expect_paren {
         return Err("Expected '(' after function".into());
+    }
+    if last_was_operator {
+        return Err("Expression ends with operator".into());
     }
 
     while let Some(op) = operators.pop() {
@@ -339,7 +320,10 @@ fn apply_operator(numbers: &mut Vec<Decimal>, op: Token) -> Result<(), Box<dyn E
             }
             let b = numbers.pop().unwrap();
             let a = numbers.pop().unwrap();
-            numbers.push(a * b);
+            match a.checked_mul(b) {
+                Some(result) => numbers.push(result),
+                None => return Err("Result too large".into()),
+            }
         }
         Token::Divide => {
             if numbers.len() < 2 {

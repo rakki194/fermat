@@ -85,6 +85,9 @@ impl ButtonGrid {
                     "abs" => "abs(".to_string(),
                     _ => button.text.clone(),
                 };
+                // Reset button state immediately
+                button.is_pressed = false;
+                self.last_clicked_button = None;
                 return Some(result);
             }
         }
@@ -99,7 +102,6 @@ impl ButtonGrid {
             let relative_x = (x - area.x) as usize;
             let relative_y = (y - area.y) as usize;
 
-            // Calculate button index based on grid layout
             let cols = 4;
             let button_width = area.width as usize / cols;
             let button_height = 3;
@@ -111,36 +113,62 @@ impl ButtonGrid {
             if index < self.buttons.len() {
                 match mouse.kind {
                     MouseEventKind::Down(MouseButton::Left) => {
+                        // Only set the button as pressed
                         self.buttons[index].is_pressed = true;
                         self.last_clicked_button = Some(index);
+                        None
                     }
                     MouseEventKind::Up(MouseButton::Left) => {
+                        // Reset button state
                         if let Some(last_idx) = self.last_clicked_button {
                             self.buttons[last_idx].is_pressed = false;
                         }
                         self.last_clicked_button = None;
 
-                        // Only return the result on mouse up if we're still over the same button
-                        let result = match self.buttons[index].text.as_str() {
-                            "C" => "CLEAR_ALL".to_string(),
-                            "CE" => "CLEAR_ENTRY".to_string(),
-                            "sqrt" => "sqrt(".to_string(),
-                            "abs" => "abs(".to_string(),
-                            _ => self.buttons[index].text.clone(),
-                        };
-                        return Some(result);
+                        // Only return the result if we're still over the same button
+                        if let Some(last_idx) = self.last_clicked_button {
+                            if last_idx == index {
+                                let result = match self.buttons[index].text.as_str() {
+                                    "C" => "CLEAR_ALL".to_string(),
+                                    "CE" => "CLEAR_ENTRY".to_string(),
+                                    "sqrt" => "sqrt(".to_string(),
+                                    "abs" => "abs(".to_string(),
+                                    _ => self.buttons[index].text.clone(),
+                                };
+                                Some(result)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
                     }
-                    _ => {}
+                    MouseEventKind::Drag(MouseButton::Left) => {
+                        // Update which button is pressed when dragging
+                        if let Some(last_idx) = self.last_clicked_button {
+                            if last_idx != index {
+                                self.buttons[last_idx].is_pressed = false;
+                                self.buttons[index].is_pressed = true;
+                                self.last_clicked_button = Some(index);
+                            }
+                        }
+                        None
+                    }
+                    _ => None,
                 }
+            } else {
+                None
             }
-        } else {
-            // Mouse moved outside the button area
+        } else if mouse.kind == MouseEventKind::Up(MouseButton::Left) {
+            // Reset button state when mouse is released outside
             if let Some(last_idx) = self.last_clicked_button {
                 self.buttons[last_idx].is_pressed = false;
                 self.last_clicked_button = None;
             }
+            None
+        } else {
+            None
         }
-        None
     }
 
     pub fn render(&mut self, frame: &mut Frame, area: Rect) {
