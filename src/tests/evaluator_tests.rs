@@ -1,6 +1,6 @@
+use crate::evaluator::{evaluate, tokenize};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
-use crate::evaluator::{tokenize, evaluate};
 
 fn assert_decimal_eq(result: Decimal, expected: f64) {
     let expected_decimal = Decimal::from_f64(expected).unwrap();
@@ -90,7 +90,12 @@ fn test_mismatched_parentheses() {
     let tokens = tokenize("(2 + 3").unwrap();
     let result = evaluate(&tokens);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Mismatched parentheses"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Mismatched parentheses")
+    );
 }
 
 #[test]
@@ -100,14 +105,20 @@ fn test_empty_expression() {
     let tokens = result.unwrap();
     let eval_result = evaluate(&tokens);
     assert!(eval_result.is_err());
-    assert!(eval_result.unwrap_err().to_string().contains("Invalid expression"));
+    assert!(
+        eval_result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid expression")
+    );
 }
 
 #[test]
 fn test_large_number_precision() {
     let tokens = tokenize("999999999999 * 999999999999").unwrap();
     let result = evaluate(&tokens).unwrap();
-    let expected = Decimal::from_i128(999999999999i128).unwrap() * Decimal::from_i128(999999999999i128).unwrap();
+    let expected = Decimal::from_i128(999999999999i128).unwrap()
+        * Decimal::from_i128(999999999999i128).unwrap();
     assert_eq!(result, expected);
 }
 
@@ -151,7 +162,12 @@ fn test_negative_sqrt() {
     let tokens = tokenize("sqrt(-1)").unwrap();
     let result = evaluate(&tokens);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Cannot compute square root of negative number"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Cannot compute square root of negative number")
+    );
 }
 
 #[test]
@@ -159,7 +175,12 @@ fn test_negative_factorial() {
     let tokens = tokenize("(-5)!").unwrap();
     let result = evaluate(&tokens);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Cannot compute factorial of negative number"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Cannot compute factorial of negative number")
+    );
 }
 
 #[test]
@@ -167,4 +188,4 @@ fn test_decimal_modulo() {
     let tokens = tokenize("10.5 % 3").unwrap();
     let result = evaluate(&tokens).unwrap();
     assert_decimal_eq(result, 1.5);
-} 
+}

@@ -1,6 +1,6 @@
 [package]
-name = "calculator"
-version = "0.1.0"
+name = "fermat"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]

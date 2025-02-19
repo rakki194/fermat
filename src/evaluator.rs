@@ -4,19 +4,18 @@
 //! using Decimal arithmetic. It includes parsers for numbers and operators,
 //! and evaluates expressions with correct operator precedence.
 
-use std::error::Error;
-use std::str::FromStr;
-use rust_decimal::Decimal;
-use rust_decimal::prelude::*;
 use nom::{
+    IResult, Parser,
     branch::alt,
     character::complete::{char, digit1, space0},
     combinator::{opt, recognize},
     multi::many0,
     sequence::{delimited, pair},
-    Parser,
-    IResult,
 };
+use rust_decimal::Decimal;
+use rust_decimal::prelude::*;
+use std::error::Error;
+use std::str::FromStr;
 
 /// Enum representing a token in the mathematical expression.
 #[derive(Debug, Clone)]
@@ -52,19 +51,16 @@ fn parse_keyword(input: &str) -> IResult<&str, Token> {
     alt((
         nom::bytes::complete::tag("sqrt").map(|_| Token::Sqrt),
         nom::bytes::complete::tag("abs").map(|_| Token::Abs),
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 fn parse_number(input: &str) -> IResult<&str, Token> {
-    recognize(
-        pair(
-            opt(char('-')),
-            pair(
-                digit1,
-                opt(pair(char('.'), digit1))
-            )
-        )
-    ).map(|num_str: &str| Token::Number(Decimal::from_str(num_str).unwrap()))
+    recognize(pair(
+        opt(char('-')),
+        pair(digit1, opt(pair(char('.'), digit1))),
+    ))
+    .map(|num_str: &str| Token::Number(Decimal::from_str(num_str).unwrap()))
     .parse(input)
 }
 
@@ -79,15 +75,17 @@ fn parse_operator(input: &str) -> IResult<&str, Token> {
         char('^').map(|_| Token::Exponentiation),
         char('(').map(|_| Token::LeftParen),
         char(')').map(|_| Token::RightParen),
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 fn parse_token(input: &str) -> IResult<&str, Token> {
     delimited(
         space0,
         alt((parse_keyword, parse_number, parse_operator)),
-        space0
-    ).parse(input)
+        space0,
+    )
+    .parse(input)
 }
 
 /// Tokenizes the input string into a vector of tokens using nom parsers.
@@ -95,7 +93,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, Box<dyn Error>> {
     let (remaining, tokens) = many0(parse_token)
         .parse(input)
         .map_err(|e| format!("Parse error: {}", e))?;
-    
+
     if !remaining.trim().is_empty() {
         return Err(format!("Unable to parse remaining input: {}", remaining).into());
     }
@@ -103,13 +101,22 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, Box<dyn Error>> {
     // Post-process tokens to handle unary minus and factorial
     let mut processed_tokens = Vec::new();
     let mut iter = tokens.into_iter().peekable();
-    
+
     while let Some(token) = iter.next() {
         match token {
-            Token::Minus if processed_tokens.is_empty() 
-                || matches!(processed_tokens.last().unwrap(), 
-                    Token::Plus | Token::Minus | Token::Multiply | Token::Divide | 
-                    Token::Modulo | Token::Exponentiation | Token::LeftParen) => {
+            Token::Minus
+                if processed_tokens.is_empty()
+                    || matches!(
+                        processed_tokens.last().unwrap(),
+                        Token::Plus
+                            | Token::Minus
+                            | Token::Multiply
+                            | Token::Divide
+                            | Token::Modulo
+                            | Token::Exponentiation
+                            | Token::LeftParen
+                    ) =>
+            {
                 // This is a unary minus
                 match iter.next() {
                     Some(Token::Number(n)) => processed_tokens.push(Token::Number(-n)),
@@ -117,13 +124,13 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, Box<dyn Error>> {
                         processed_tokens.push(Token::LeftParen);
                         processed_tokens.push(Token::Number(Decimal::from(-1)));
                         processed_tokens.push(Token::Multiply);
-                    },
+                    }
                     _ => return Err("Invalid unary minus".into()),
                 }
-            },
+            }
             Token::Sqrt | Token::Abs => {
                 processed_tokens.push(token);
-            },
+            }
             Token::Factorial => {
                 // Apply factorial to the last number or parenthesized expression
                 if let Some(last_token) = processed_tokens.last() {
@@ -132,14 +139,14 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, Box<dyn Error>> {
                             let result = factorial(n)?;
                             processed_tokens.pop();
                             processed_tokens.push(Token::Number(result));
-                        },
+                        }
                         Token::RightParen => processed_tokens.push(token),
                         _ => return Err("Invalid factorial operation".into()),
                     }
                 } else {
                     return Err("Invalid factorial operation".into());
                 }
-            },
+            }
             Token::Minus => {
                 // This is a binary minus
                 if let Some(Token::Number(_)) = iter.peek() {
@@ -149,11 +156,11 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, Box<dyn Error>> {
                     processed_tokens.push(Token::Number(-Decimal::ONE));
                     processed_tokens.push(Token::Multiply);
                 }
-            },
+            }
             _ => processed_tokens.push(token),
         }
     }
-    
+
     Ok(processed_tokens)
 }
 
@@ -197,18 +204,18 @@ pub fn evaluate(tokens: &[Token]) -> Result<Decimal, Box<dyn Error>> {
                 Token::RightParen,
             ) = (
                 &tokens[i],
-                &tokens[i+1],
-                &tokens[i+2],
-                &tokens[i+3],
-                &tokens[i+4],
-                &tokens[i+5],
-                &tokens[i+6],
-                &tokens[i+7],
-                &tokens[i+8],
-                &tokens[i+9],
-                &tokens[i+10],
-                &tokens[i+11],
-                &tokens[i+12],
+                &tokens[i + 1],
+                &tokens[i + 2],
+                &tokens[i + 3],
+                &tokens[i + 4],
+                &tokens[i + 5],
+                &tokens[i + 6],
+                &tokens[i + 7],
+                &tokens[i + 8],
+                &tokens[i + 9],
+                &tokens[i + 10],
+                &tokens[i + 11],
+                &tokens[i + 12],
             ) {
                 if base1 == base2 && exp1 == exp2 && exp1.fract().is_zero() {
                     // Pattern matched! Return b directly
@@ -231,13 +238,13 @@ pub fn evaluate(tokens: &[Token]) -> Result<Decimal, Box<dyn Error>> {
                 if expect_paren {
                     return Err("Expected '(' after function".into());
                 }
-                numbers.push(n.clone());
-            },
+                numbers.push(*n);
+            }
             Token::LeftParen => {
                 paren_count += 1;
                 expect_paren = false;
                 operators.push(tokens[i].clone());
-            },
+            }
             Token::RightParen => {
                 paren_count -= 1;
                 if paren_count < 0 {
@@ -250,29 +257,35 @@ pub fn evaluate(tokens: &[Token]) -> Result<Decimal, Box<dyn Error>> {
                     apply_operator(&mut numbers, operators.pop().unwrap())?;
                 }
                 operators.pop(); // Remove LeftParen
-                
+
                 // Apply any pending function
                 if let Some(Token::Sqrt | Token::Abs) = operators.last() {
                     apply_operator(&mut numbers, operators.pop().unwrap())?;
                 }
-            },
+            }
             Token::Sqrt | Token::Abs => {
                 expect_paren = true;
                 operators.push(tokens[i].clone());
-            },
-            op @ (Token::Plus | Token::Minus | Token::Multiply | Token::Divide | Token::Modulo | 
-                 Token::Exponentiation | Token::Factorial) => {
+            }
+            op @ (Token::Plus
+            | Token::Minus
+            | Token::Multiply
+            | Token::Divide
+            | Token::Modulo
+            | Token::Exponentiation
+            | Token::Factorial) => {
                 if expect_paren {
                     return Err("Expected '(' after function".into());
                 }
                 let is_right_associative = matches!(op, Token::Exponentiation);
-                
+
                 while let Some(top_op) = operators.last() {
                     if let Token::LeftParen = top_op {
                         break;
                     }
-                    if (is_right_associative && precedence(top_op) > precedence(op)) ||
-                       (!is_right_associative && precedence(top_op) >= precedence(op)) {
+                    if (is_right_associative && precedence(top_op) > precedence(op))
+                        || (!is_right_associative && precedence(top_op) >= precedence(op))
+                    {
                         apply_operator(&mut numbers, operators.pop().unwrap())?;
                     } else {
                         break;
@@ -311,7 +324,7 @@ fn apply_operator(numbers: &mut Vec<Decimal>, op: Token) -> Result<(), Box<dyn E
             let b = numbers.pop().unwrap();
             let a = numbers.pop().unwrap();
             numbers.push(a + b);
-        },
+        }
         Token::Minus => {
             if numbers.len() < 2 {
                 return Err("Not enough operands for subtraction".into());
@@ -319,7 +332,7 @@ fn apply_operator(numbers: &mut Vec<Decimal>, op: Token) -> Result<(), Box<dyn E
             let b = numbers.pop().unwrap();
             let a = numbers.pop().unwrap();
             numbers.push(a - b);
-        },
+        }
         Token::Multiply => {
             if numbers.len() < 2 {
                 return Err("Not enough operands for multiplication".into());
@@ -327,7 +340,7 @@ fn apply_operator(numbers: &mut Vec<Decimal>, op: Token) -> Result<(), Box<dyn E
             let b = numbers.pop().unwrap();
             let a = numbers.pop().unwrap();
             numbers.push(a * b);
-        },
+        }
         Token::Divide => {
             if numbers.len() < 2 {
                 return Err("Not enough operands for division".into());
@@ -338,7 +351,7 @@ fn apply_operator(numbers: &mut Vec<Decimal>, op: Token) -> Result<(), Box<dyn E
                 return Err("division by zero".into());
             }
             numbers.push(a / b);
-        },
+        }
         Token::Modulo => {
             if numbers.len() < 2 {
                 return Err("Not enough operands for modulo".into());
@@ -349,39 +362,40 @@ fn apply_operator(numbers: &mut Vec<Decimal>, op: Token) -> Result<(), Box<dyn E
                 return Err("modulo by zero".into());
             }
             numbers.push(a % b);
-        },
+        }
         Token::Exponentiation => {
             if numbers.len() < 2 {
                 return Err("Not enough operands for exponentiation".into());
             }
             let b = numbers.pop().unwrap();
             let a = numbers.pop().unwrap();
-            
+
             // Check if exponent is an integer
             if b.fract().is_zero() {
                 // Handle integer exponentiation
                 let exp = b.to_i128().ok_or("Exponent too large")?;
-                
+
                 // For very large exponents, we need to check if the result would be too large
                 if exp > 0 {
                     // Estimate result size by counting digits in base and multiplying by exponent
                     let base_digits = a.abs().to_string().trim_end_matches('0').len();
-                    if base_digits as i128 * exp > 28 {  // Decimal can handle up to 28-29 digits
+                    if base_digits as i128 * exp > 28 {
+                        // Decimal can handle up to 28-29 digits
                         return Err("Result would be too large".into());
                     }
                 }
-                
+
                 let mut result = Decimal::ONE;
-                let mut base = if exp < 0 { 
+                let mut base = if exp < 0 {
                     if a.is_zero() {
                         return Err("Division by zero in negative exponent".into());
                     }
-                    Decimal::ONE / a 
-                } else { 
-                    a 
+                    Decimal::ONE / a
+                } else {
+                    a
                 };
                 let mut exp_abs = exp.abs();
-                
+
                 while exp_abs > 0 {
                     if exp_abs & 1 == 1 {
                         // Check for potential overflow before multiplying
@@ -407,21 +421,21 @@ fn apply_operator(numbers: &mut Vec<Decimal>, op: Token) -> Result<(), Box<dyn E
                 let base = a.to_f64().ok_or("Cannot convert base to f64")?;
                 let exp = b.to_f64().ok_or("Cannot convert exponent to f64")?;
                 let result = base.powf(exp);
-                
+
                 if result.is_nan() || result.is_infinite() {
                     return Err("Invalid exponentiation result".into());
                 }
-                
+
                 numbers.push(Decimal::from_f64(result).ok_or("Result too large for decimal")?);
             }
-        },
+        }
         Token::Factorial => {
             if numbers.is_empty() {
                 return Err("Not enough operands for factorial".into());
             }
             let n = numbers.pop().unwrap();
             numbers.push(factorial(&n)?);
-        },
+        }
         Token::Sqrt => {
             if numbers.is_empty() {
                 return Err("Not enough operands for square root".into());
@@ -433,14 +447,14 @@ fn apply_operator(numbers: &mut Vec<Decimal>, op: Token) -> Result<(), Box<dyn E
             let f = n.to_f64().ok_or("Cannot convert to f64")?;
             let result = f.sqrt();
             numbers.push(Decimal::from_f64(result).ok_or("Cannot convert result to Decimal")?);
-        },
+        }
         Token::Abs => {
             if numbers.is_empty() {
                 return Err("Not enough operands for absolute value".into());
             }
             let n = numbers.pop().unwrap();
             numbers.push(n.abs());
-        },
+        }
         _ => return Err("Invalid operator".into()),
     }
     Ok(())
@@ -450,12 +464,12 @@ fn factorial(n: &Decimal) -> Result<Decimal, Box<dyn Error>> {
     if *n < Decimal::ZERO {
         return Err("Cannot compute factorial of negative number".into());
     }
-    
+
     let n_int = n.to_i128().ok_or("Number too large for factorial")?;
     if n_int > 20 {
         return Err("Factorial result too large".into());
     }
-    
+
     let mut result = Decimal::ONE;
     for i in 1..=n_int {
         result *= Decimal::from(i);
@@ -474,4 +488,3 @@ fn gcd(mut a: i128, mut b: i128) -> i128 {
     }
     a
 }
-

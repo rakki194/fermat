@@ -32,7 +32,7 @@ A powerful Terminal User Interface (TUI) calculator built in Rust that provides 
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/yourusername/fermat.git
+    git clone https://github.com/rakki194/fermat.git
     cd fermat
     ```
 
