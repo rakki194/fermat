@@ -2,6 +2,13 @@
 name = "fermat"
 version = "0.1.1"
 edition = "2024"
+description = "A terminal-based calculator with a TUI interface"
+license = "MIT"
+repository = "https://github.com/rakki194/fermat"
+homepage = "https://github.com/rakki194/fermat"
+documentation = "https://docs.rs/fermat"
+keywords = ["calculator", "tui", "terminal", "math", "decimal"]
+categories = ["command-line-utilities", "mathematics", "science"]
 
 [dependencies]
 crossterm = "0.28.1"
